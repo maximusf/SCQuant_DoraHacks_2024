@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from imblearn.combine import SMOTEENN
 from catboost import CatBoostClassifier
@@ -36,6 +36,7 @@ for bit_string in bit_strings:
 features = pd.DataFrame(features_list)
 print("Features shape after parsing bit strings:", features.shape)
 
+
 # Feature extraction function
 def extract_features(row):
     measurements = row.values.astype(int)
@@ -49,6 +50,7 @@ def extract_features(row):
 
     return pd.Series(features)
 
+
 # Additional features (mean, variance, count of 1's and 0's)
 def additional_features(bit_string):
     bit_array = np.array([int(bit) for bit in bit_string])
@@ -58,6 +60,7 @@ def additional_features(bit_string):
         'ones_count': np.sum(bit_array),
         'zeros_count': len(bit_array) - np.sum(bit_array)
     }
+
 
 # Apply feature extraction and additional features
 features_extracted = features.apply(extract_features, axis=1)
@@ -84,58 +87,28 @@ X_test_selected = rfe_selector.transform(X_test)
 y_train_resampled = y_train_resampled.astype(int)
 y_test = y_test.astype(int)
 
-# Hyperparameter tuning for CatBoost
-# Define the CatBoost model
-catboost_model = CatBoostClassifier(verbose=0, random_state=42)
+# Train CatBoost model
+catboost_model = CatBoostClassifier(iterations=100, learning_rate=0.05, depth=8, random_seed=42, verbose=0)
+catboost_model.fit(X_train_selected, y_train_resampled)
 
-# Define the parameter grid
-param_dist = {
-    'learning_rate': [0.01, 0.05, 0.1, 0.2],
-    'depth': [4, 6, 8, 10],
-    'iterations': [100, 200, 300, 500],
-    'l2_leaf_reg': [1, 3, 5, 7, 9],
-    'bagging_temperature': [0.1, 0.2, 0.5, 1.0]
-}
-
-# Set up the RandomizedSearchCV with CatBoost
-random_search = RandomizedSearchCV(
-    catboost_model,
-    param_distributions=param_dist,
-    n_iter=20,  # Number of random combinations to try
-    scoring='accuracy',
-    cv=3,  # 3-fold cross-validation
-    random_state=42,
-    n_jobs=-1,  # Use all available cores
-    verbose=1
-)
-
-# Fit the random search model
-random_search.fit(X_train_selected, y_train_resampled)
-
-# Print the best parameters and the best score
-print(f"Best parameters: {random_search.best_params_}")
-print(f"Best cross-validation accuracy: {random_search.best_score_:.4f}")
-
-# Predict using the best model found by RandomizedSearchCV
-best_catboost_model = random_search.best_estimator_
-
-y_pred_best_catboost = best_catboost_model.predict(X_test_selected)
+# Predict on the test set
+y_pred_catboost = catboost_model.predict(X_test_selected)
 
 # Calculate evaluation metrics
-accuracy_best = accuracy_score(y_test, y_pred_best_catboost)
-precision_best = precision_score(y_test, y_pred_best_catboost, zero_division=0)
-recall_best = recall_score(y_test, y_pred_best_catboost, zero_division=0)
-f1_best = f1_score(y_test, y_pred_best_catboost, zero_division=0)
+accuracy_catboost = accuracy_score(y_test, y_pred_catboost)
+precision_catboost = precision_score(y_test, y_pred_catboost, zero_division=0)
+recall_catboost = recall_score(y_test, y_pred_catboost, zero_division=0)
+f1_catboost = f1_score(y_test, y_pred_catboost, zero_division=0)
 
-# Print results
-print(f"\nTuned CatBoost Model Test Accuracy: {accuracy_best:.4f}")
-print(f"Tuned CatBoost Model Precision: {precision_best:.4f}")
-print(f"Tuned CatBoost Model Recall: {recall_best:.4f}")
-print(f"Tuned CatBoost Model F1-Score: {f1_best:.4f}")
+# Print CatBoost results
+print(f"\nCatBoost Model Test Accuracy: {accuracy_catboost:.4f}")
+print(f"CatBoost Model Precision: {precision_catboost:.4f}")
+print(f"CatBoost Model Recall: {recall_catboost:.4f}")
+print(f"CatBoost Model F1-Score: {f1_catboost:.4f}")
 
 # Stacking Classifier: CatBoost, RandomForest, Logistic Regression
 estimators = [
-    ('catboost', best_catboost_model),
+    ('catboost', CatBoostClassifier(iterations=100, learning_rate=0.05, depth=8, random_seed=42, verbose=0)),
     ('rf', RandomForestClassifier(n_estimators=100, random_state=42)),
     ('lr', LogisticRegression(max_iter=1000))
 ]
