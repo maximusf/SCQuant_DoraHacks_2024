@@ -4,9 +4,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import tensorflow as tf
 from sklearn.utils import shuffle
+import scipy.fftpack as fft
+import matplotlib.pyplot as plt
 
 # Load the data
-data_filePath = '100qb_letsTryAgain.txt'
+data_filePath = '1000qb_combined_output.txt'
 data = pd.read_csv(data_filePath, sep=r'\s+', header=None)
 
 # Display basic data information
@@ -15,10 +17,10 @@ print(data.head())
 
 # Extract bit strings and labels
 bit_strings = data.iloc[:, 0]  # Column with bit strings
-labels = data.iloc[:, 1]       # Column with labels
+labels = data.iloc[:, 1]  # Column with labels
 
 # Map labels appropriately: PRNG -> 0, QRNG -> 1
-label_mapping = {1: 0, 2: 1}   # Assuming 1 -> PRNG and 2 -> QRNG
+label_mapping = {1: 0, 2: 1}  # Assuming 1 -> PRNG and 2 -> QRNG
 labels = labels.map(label_mapping)
 labels.fillna(labels.mode()[0], inplace=True)
 labels = labels.astype(int)
@@ -100,3 +102,65 @@ print(f"\nCNN Model Test Accuracy: {accuracy_cnn:.4f}")
 print(f"CNN Model Precision: {precision_cnn:.4f}")
 print(f"CNN Model Recall: {recall_cnn:.4f}")
 print(f"CNN Model F1-Score: {f1_cnn:.4f}")
+
+
+# DFT Test Implementation
+def dft_test(bit_strings):
+    n = len(bit_strings)
+    fft_result = np.abs(fft.fft(bit_strings))[:n // 2]  # Use only half of the FFT output (real part)
+
+    # Threshold for peaks
+    threshold = np.sqrt(np.log(1 / 0.05) * n)
+
+    # Compute expected number of peaks for random data
+    expected_peaks = 0.95 * (n / 2)
+
+    # Check if the sequence passes the DFT test
+    passes_dft = np.sum(fft_result > threshold) <= expected_peaks
+    return passes_dft, fft_result
+
+
+# Run the DFT test on the dataset
+bit_string_array = np.array(features_list).flatten()
+passes_dft, fft_result = dft_test(bit_string_array)
+print(f"DFT Test Passed: {passes_dft}")
+
+# Plot the FFT result
+plt.plot(fft_result)
+plt.title('DFT Test - FFT Magnitude')
+plt.axhline(y=np.sqrt(np.log(1 / 0.05) * len(bit_string_array)), color='r', linestyle='--')
+plt.show()
+
+
+# Linear Complexity Test Implementation
+def berlekamp_massey_algorithm(bit_string):
+    n = len(bit_string)
+    c = [0] * n
+    b = [0] * n
+    c[0], b[0] = 1, 1
+    l, m, i = 0, -1, 0
+
+    for n in range(n):
+        discrepancy = (bit_string[n] + sum([c[j] * bit_string[n - j - 1] for j in range(1, l + 1)])) % 2
+        if discrepancy == 1:
+            temp = c[:]
+            for j in range(n - m):
+                c[n - m + j] = (c[n - m + j] + b[j]) % 2
+            if l <= n // 2:
+                l = n + 1 - l
+                m = n
+                b = temp
+    return l
+
+
+def linear_complexity_test(bit_strings, threshold=0.01):
+    complexities = [berlekamp_massey_algorithm(bit_string) for bit_string in bit_strings]
+    mean_complexity = np.mean(complexities)
+    passes_complexity_test = mean_complexity > len(bit_strings[0]) * threshold
+    return passes_complexity_test, mean_complexity, complexities
+
+
+# Run the linear complexity test
+passes_lc, mean_complexity, complexities = linear_complexity_test(features_list)
+print(f"Linear Complexity Test Passed: {passes_lc}")
+print(f"Mean Linear Complexity: {mean_complexity}")
