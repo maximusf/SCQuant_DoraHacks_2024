@@ -70,7 +70,7 @@ X_test_cnn = X_test.reshape(-1, X_test.shape[1], 1)
 
 # Build and Train CNN Model
 cnn_model = create_cnn_model()
-cnn_model.fit(X_train_cnn, tf.keras.utils.to_categorical(y_train, num_classes=2), epochs=50, batch_size=32, verbose=1)
+history = cnn_model.fit(X_train_cnn, tf.keras.utils.to_categorical(y_train, num_classes=2), epochs=50, batch_size=32, verbose=1, validation_data=(X_test_cnn, tf.keras.utils.to_categorical(y_test, num_classes=2)))
 
 # Predict with CNN model
 cnn_train_predictions = cnn_model.predict(X_train_cnn)
@@ -114,59 +114,12 @@ print(f"Stacking Ensemble Model Precision: {precision_stacked:.4f}")
 print(f"Stacking Ensemble Model Recall: {recall_stacked:.4f}")
 print(f"Stacking Ensemble Model F1-Score: {f1_stacked:.4f}")
 
-# DFT Test Implementation
-def dft_test(bit_strings):
-    n = len(bit_strings)
-    fft_result = np.abs(fft.fft(bit_strings))[:n // 2]  # Use only half of the FFT output (real part)
-
-    # Threshold for peaks
-    threshold = np.sqrt(np.log(1 / 0.05) * n)
-
-    # Compute expected number of peaks for random data
-    expected_peaks = 0.95 * (n / 2)
-
-    # Check if the sequence passes the DFT test
-    passes_dft = np.sum(fft_result > threshold) <= expected_peaks
-    return passes_dft, fft_result
-
-# Run the DFT test on the dataset
-bit_string_array = np.array(features_list).flatten()
-passes_dft, fft_result = dft_test(bit_string_array)
-print(f"DFT Test Passed: {passes_dft}")
-
-# Plot the FFT result
-plt.plot(fft_result)
-plt.title('DFT Test - FFT Magnitude')
-plt.axhline(y=np.sqrt(np.log(1 / 0.05) * len(bit_string_array)), color='r', linestyle='--')
+# Plot CNN training and validation accuracy over epochs
+plt.figure()
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('CNN Accuracy Over Epochs')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
 plt.show()
-
-# Linear Complexity Test Implementation
-def berlekamp_massey_algorithm(bit_string):
-    n = len(bit_string)
-    c = [0] * n
-    b = [0] * n
-    c[0], b[0] = 1, 1
-    l, m, i = 0, -1, 0
-
-    for n in range(n):
-        discrepancy = (bit_string[n] + sum([c[j] * bit_string[n - j - 1] for j in range(1, l + 1)])) % 2
-        if discrepancy == 1:
-            temp = c[:]
-            for j in range(n - m):
-                c[n - m + j] = (c[n - m + j] + b[j]) % 2
-            if l <= n // 2:
-                l = n + 1 - l
-                m = n
-                b = temp
-    return l
-
-def linear_complexity_test(bit_strings, threshold=0.01):
-    complexities = [berlekamp_massey_algorithm(bit_string) for bit_string in bit_strings]
-    mean_complexity = np.mean(complexities)
-    passes_complexity_test = mean_complexity > len(bit_strings[0]) * threshold
-    return passes_complexity_test, mean_complexity, complexities
-
-# Run the linear complexity test
-passes_lc, mean_complexity, complexities = linear_complexity_test(features_list)
-print(f"Linear Complexity Test Passed: {passes_lc}")
-print(f"Mean Linear Complexity: {mean_complexity}")
