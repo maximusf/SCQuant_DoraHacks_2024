@@ -7,7 +7,6 @@ from sklearn.utils import shuffle
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 import tensorflow as tf
-import scipy.fftpack as fft
 import matplotlib.pyplot as plt
 
 # Load the data
